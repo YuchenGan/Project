@@ -1,0 +1,345 @@
+#### before that, set connect to PostgreSQL driver. 
+
+# Load needed packages
+require('RPostgreSQL')
+
+#Load the PostgreSQL driver:
+drv <- dbDriver('PostgreSQL')
+install.packages("splitstackshape", dep=T)
+library(dplyr)
+# list credentials here
+hostname = 'cu-spring2020-group1.cggz75b61mlh.us-east-2.rds.amazonaws.com'
+username = 'postgres'
+pwd = 'postgres'
+database = 'postgres'
+
+#Create a connection 
+con <- dbConnect(drv, dbname = database,
+                 host = hostname, port = 5432,
+                 user = username, password = pwd)
+
+# upload database
+df <- read.csv('~/Desktop/clear_data_NYC_job_12.csv')
+str(df)
+View(df)
+
+
+
+stmt = "
+Drop table if exists full_part_table;
+drop table if exists job_hours_table;
+drop table if exists job_info_table;
+
+
+Drop table if exists location_Job_table;
+Drop table if exists apply_job_table;
+
+Drop table if exists job_type_table;
+
+Drop table if exists salary_career_level_table;
+drop table if exists salary_table;
+drop table if exists category_table;
+drop table if exists apply_entrance_table;
+drop table if exists title_classification_table;
+
+drop table if exists requirement_table;
+drop table location_table;
+drop table post_info_table;
+
+drop table if exists career_level_table;
+
+
+
+
+
+
+
+Create table post_info_table(
+  post_id int primary key not null,
+  posting_date date,
+  post_until  varchar,
+  posting_updated date);
+
+Create table location_table(
+  location_id int primary key not null,
+  work_location_sepcific varchar(1000),
+  work_location_agency varchar(1000));
+
+create table requirement_table(
+  requirement_id	int primary key not null,
+  preferred_skills text,
+  residency_requirement  varchar,
+  additional_information text);
+  
+create table salary_table(
+  salary_id int not null,
+  salary_range_from decimal(10,2),
+  salary_range_to decimal(10,2),
+  salary_frequency varchar(10),
+  primary key (salary_id));
+
+Create table career_level_table (
+  level_id			integer, 
+  career_level 		varchar(30),
+  primary key (level_id));
+  
+Create table title_classification_table(
+  classification_id 	int,
+  title_classification 	varchar(40),
+  primary key (classification_id));
+
+CREATE TABLE apply_entrance_table (
+    apply_id  integer,
+    to_apply varchar not null,
+    PRIMARY KEY (apply_id)
+  );
+
+Create table category_table (
+    category_id int,
+    job_category varchar, 
+    PRIMARY KEY (category_id));
+
+  
+Create table job_type_table (
+  type_id          int,
+  posting_type 		varchar,
+  primary key (type_id));
+  
+CREATE TABLE salary_career_level_table (
+    salary_career_id int,
+    salary_id integer,
+    level_id integer,
+    PRIMARY KEY (salary_career_id),
+    FOREIGN KEY (salary_id) REFERENCES salary_table(salary_id),
+    FOREIGN KEY (level_id) REFERENCES career_level_table (level_id)
+  );
+
+
+Create table apply_job_table (
+    id int,
+    apply_id int,
+    PRIMARY KEY (id),
+    Foreign key(apply_id) references apply_entrance_table(apply_id));
+
+
+
+Create table location_Job_table(
+  id int,
+  location_id int,
+  primary key (id),
+  foreign key(location_id) references location_table(location_id));
+  
+Create table job_info_table(
+  id    int primary key not null,
+  job_id   int,
+  business_title varchar(1000) not null,
+  post_id   int not null,
+  salary_career_id int,
+  category_id int,
+  requirement_id int,
+  type_id int,
+  classification_id int,
+  foreign key (post_id) references post_info_table(post_id),
+  foreign key (requirement_id) references requirement_table(requirement_id),
+  Foreign key (classification_id) references title_classification_table (classification_id),
+  Foreign key (salary_career_id) references salary_career_level_table (salary_career_id),
+  Foreign key (category_id) references category_table (category_id),
+  Foreign key (type_id) references job_type_table (type_id)
+  );
+
+create table job_hours_table(
+  id	int primary key not null,
+  hours_shift varchar,
+  foreign key (id) references job_info_table(id)
+);
+
+CREATE TABLE full_part_table (
+    id integer,
+    full_part varchar(50),
+    FOREIGN KEY (id) REFERENCES job_info_table(id)
+  );
+
+"
+
+
+# send query
+
+rs<- dbSendQuery(con, stmt)
+rs
+
+#create ID
+df$id <- 1:nrow(df) 
+
+
+#Create Post_info_table 
+post =c('posting_date', 'post_until','posting_updated')
+temp_post_df = unique(df[post])
+temp_post_df$post_id = 1:nrow(temp_post_df)
+
+str(temp_post_df$post_until)
+
+temp_post_df$post_until <- as.character(temp_post_df$post_until )
+temp_post_df$post_until[temp_post_df$post_until==' '] <- 'NA'
+#temp_post_df$post_until <- as.factor(temp_post_df$post_until)
+
+head(temp_post_df$post_until,100)
+
+
+df_1 = merge(x = df, y = temp_post_df, by =c('posting_date', 'post_until','posting_updated'), all.x = TRUE)
+df_1[post][df_1$posting_date %in% '6/26/19',]
+head(df_1$post_id)
+sum(is.na(df_1$post_id))
+nrow(df_1)
+
+df_1$post_until <- as.character(df_1$post_until )
+df_1$post_until[df_1$post_until==''] <- 'NA'
+#df_1$post_until <- as.factor(df_1$post_until)
+
+head(df_1$post_until,1000)
+str(df_1$post_until)
+
+dbWriteTable(con, name="post_info_table", 
+             value=df_1[c('post_id','posting_date','post_until', 'posting_updated')]
+             [!duplicated(df_1[c('post_id','posting_date','post_until', 'posting_updated')]),],
+             row.names=FALSE, append=TRUE)
+
+
+# Create location_table
+work = c('work_location_sepcific', 'work_location_agency')
+temp_locationid_df$work_location_agency[temp_locationid_df$work_location_agency==""] <- "NA"
+temp_locationid_df$work_location_specific[temp_locationid_df$work_location_specific==""] <- "NA"
+temp_locationid_df <-unique(df_1[work])
+temp_locationid_df$location_id = 1:nrow(temp_locationid_df)
+head(temp_locationid_df$location_id)
+sum(is.na(temp_locationid_df$location_id))
+
+df_2 = merge(df_1, temp_locationid_df, by = work, all.x =TRUE)
+
+head(df_2$location_id)
+
+dbWriteTable(con, name="location_table", 
+             value=df_2[c('location_id','work_location_sepcific','work_location_agency')]
+             [!duplicated(df_2[c('location_id','work_location_sepcific','work_location_agency')]),],
+             row.names=FALSE, append=TRUE)
+
+
+##requirement table   Table3  
+re_list = c('preferred_skills', 'residency_requirement', 'additional_information')
+temp_require_df <-unique(df[re_list])
+temp_require_df$requirement_id = 1:nrow(temp_require_df)
+df_2 = merge(df_2, temp_require_df, by = re_list) 
+head(df_2$requirement_id)
+
+dbWriteTable(con, name="requirement_table", 
+             value=df_2[c('requirement_id','preferred_skills','residency_requirement','additional_information')]
+             [!duplicated(df_2[c('requirement_id','preferred_skills','residency_requirement','additional_information')]),],
+             row.names=FALSE, append=TRUE)
+head(dbReadTable(con,name='requirement_table'),3)
+
+##salary table  Table 4  
+salary = c('salary_range_from','salary_range_to','salary_frequency')
+temp_salary_df = unique(df[salary])
+temp_salary_df$salary_id = 1:nrow(temp_salary_df)
+df_2 = merge(df_2, temp_salary_df, by = salary) 
+
+dbWriteTable(con, name="salary_table", 
+             value=df_2[c('salary_id', 'salary_range_from','salary_range_to','salary_frequency')]
+             [!duplicated(df_2[c('salary_id', 'salary_range_from','salary_range_to','salary_frequency')]),],
+             row.names=FALSE, append=TRUE)
+head(dbReadTable(con,name='salary_table'),3)
+
+
+## career_level_table
+
+temp_level_df <- data.frame('career_level' = unique(df_2$career_level))
+temp_level_df$level_id <- 1:nrow(temp_level_df)
+head(temp_level_df)
+df_2 = merge(df_2, temp_level_df, by = "career_level") 
+
+dbWriteTable(con, name="career_level_table", 
+             value=df_2[c('level_id', 'career_level')][!duplicated(df_2[c('level_id', 'career_level')]),],
+             row.names=FALSE, append=TRUE)
+
+###### title_classification
+
+
+temp_title_df <- data.frame('title_classification' = unique(df$title_classification))
+temp_title_df$classification_id <- 1:nrow(temp_title_df)
+
+head(temp_title_df)
+df_2 = merge(df_2, temp_title_df, by = "title_classification") 
+
+dbWriteTable(con, name="title_classification_table", 
+             value=df_2[c('classification_id', 'title_classification')][!duplicated(df_2[c('classification_id', 'title_classification')]),],
+             row.names=FALSE, append=TRUE)
+
+
+
+#####apply_entrance_table
+
+ ##Create temporary dataframe with apply type name
+temp_apply_df <- data.frame('to_apply' = unique(df_2$to_apply))
+
+# Add incrementing integers
+temp_apply_df$apply_id <- 1:nrow(temp_apply_df)
+
+# Map apply_id
+apply_id_list <- sapply(df_2$to_apply, function(x) temp_apply_df$apply_id[temp_apply_df$to_apply == x])
+
+# Add apply_id to the main dataframe
+df_2$apply_id <- apply_id_list
+
+# populate apply_entrance_table
+dbWriteTable(con, name="apply_entrance_table", 
+             value=df_2[c('apply_id', 'to_apply')][!duplicated(df_2[c('apply_id')]),],
+             row.names=FALSE, append=TRUE)
+
+
+
+
+
+#####category_table
+# Create temporary dataframe with category
+temp_cate_df = data.frame('job_category' = unique(df_2$job_category))
+
+# Add incrementing integers
+temp_cate_df$category_id <- 1:nrow(temp_cate_df)
+
+# Map apply_id
+cate_id_list <- sapply(df_2$job_category, function(x) temp_cate_df$category_id[temp_cate_df$job_category == x])
+
+# Add apply_id to the main dataframe
+df_2$category_id <- cate_id_list
+
+#subset job category table and rename job.ID column
+#df_2 <- df_2[c('category_id', 'job_category')]
+
+
+# populate category_table
+dbWriteTable(con, name="category_table", 
+             value=df_2[c('category_id', 'job_category')][
+               !duplicated(df_2[c('category_id', 'job_category')]),],
+             row.names=FALSE, append=TRUE)
+
+
+
+
+##job_type_table
+
+temp_type_df <- data.frame('posting_type' = unique(df_2$posting_type))
+temp_type_df$type_id <- 1:nrow(temp_type_df)
+
+df_2 = merge(df_2, temp_type_df, by = "posting_type") 
+
+head(temp_type_df)
+dbWriteTable(con, name="job_type_table", 
+             value=df_2[c('type_id', 'posting_type')][!duplicated(df_2[c('type_id', 'posting_type')]),],
+             row.names=FALSE, append=TRUE)
+
+
+###########3#salary_career_level_table############3
+
+##apply_job_table
+dbWriteTable(con, name="apply_job_table", 
+             value=df_2[c('apply_id', 'id')][!duplicated(df_2[c('apply_id', 'id')]),],
+             row.names=FALSE, append=TRUE)
