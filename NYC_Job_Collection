@@ -1,14 +1,12 @@
-#### before that, set connect to PostgreSQL driver. 
-
 # Load needed packages
 require('RPostgreSQL')
 
 #Load the PostgreSQL driver:
 drv <- dbDriver('PostgreSQL')
-install.packages("splitstackshape", dep=T)
+#install.packages("splitstackshape", dep=T)
 library(dplyr)
 # list credentials here
-hostname = 'cu-spring2020-group1.cggz75b61mlh.us-east-2.rds.amazonaws.com'
+hostname = 'cu-spring2020-group7.cggz75b61mlh.us-east-2.rds.********.com'
 username = 'postgres'
 pwd = 'postgres'
 database = 'postgres'
@@ -19,40 +17,44 @@ con <- dbConnect(drv, dbname = database,
                  user = username, password = pwd)
 
 # upload database
+
 df <- read.csv('~/Desktop/clear_data_NYC_job_12.csv')
 str(df)
-View(df)
-
 
 
 stmt = "
 Drop table if exists full_part_table;
 drop table if exists job_hours_table;
 drop table if exists job_info_table;
+Drop table if exists location_Job_table cascade;
+Drop table if exists apply_job_table cascade;
+
+Drop table if exists job_type_table cascade;
+
+Drop table if exists salary_career_level_table cascade;
+
+drop table if exists salary_table cascade;
+
+drop table if exists category_table cascade;
+
+drop table if exists apply_entrance_table cascade;
+
+drop table if exists title_classification_table cascade;
+
+drop table if exists requirement_table cascade;
+
+drop table if exists location_table cascade;
+
+drop table if exists post_info_table cascade;
+
+drop table if exists career_level_table cascade;
+
+"
+
+rs<- dbSendQuery(con, stmt)
 
 
-Drop table if exists location_Job_table;
-Drop table if exists apply_job_table;
-
-Drop table if exists job_type_table;
-
-Drop table if exists salary_career_level_table;
-drop table if exists salary_table;
-drop table if exists category_table;
-drop table if exists apply_entrance_table;
-drop table if exists title_classification_table;
-
-drop table if exists requirement_table;
-drop table location_table;
-drop table post_info_table;
-
-drop table if exists career_level_table;
-
-
-
-
-
-
+stmt = "
 
 Create table post_info_table(
   post_id int primary key not null,
@@ -154,6 +156,7 @@ create table job_hours_table(
 );
 
 CREATE TABLE full_part_table (
+    full_part_id integer primary key,
     id integer,
     full_part varchar(50),
     FOREIGN KEY (id) REFERENCES job_info_table(id)
@@ -168,7 +171,7 @@ rs<- dbSendQuery(con, stmt)
 rs
 
 #create ID
-df$id <- 1:nrow(df) 
+df$id <- 1:nrow(df)
 
 
 #Create Post_info_table 
@@ -176,27 +179,25 @@ post =c('posting_date', 'post_until','posting_updated')
 temp_post_df = unique(df[post])
 temp_post_df$post_id = 1:nrow(temp_post_df)
 
-str(temp_post_df$post_until)
 
-temp_post_df$post_until <- as.character(temp_post_df$post_until )
-temp_post_df$post_until[temp_post_df$post_until==' '] <- 'NA'
-#temp_post_df$post_until <- as.factor(temp_post_df$post_until)
+#temp_post_df$post_until <- as.character(temp_post_df$post_until)
+#temp_post_df$post_until[temp_post_df$post_until== ""] <- "NA"
+
+#df$post_until <- as.character(df$post_until)
+#df$post_until[df$post_until== ""] <- "NA"
+
 
 head(temp_post_df$post_until,100)
 
 
 df_1 = merge(x = df, y = temp_post_df, by =c('posting_date', 'post_until','posting_updated'), all.x = TRUE)
-df_1[post][df_1$posting_date %in% '6/26/19',]
-head(df_1$post_id)
-sum(is.na(df_1$post_id))
-nrow(df_1)
+head(df_1)
 
-df_1$post_until <- as.character(df_1$post_until )
-df_1$post_until[df_1$post_until==''] <- 'NA'
+
+#df_1$post_until <- as.character(df_1$post_until )
+#df_1$post_until[df_1$post_until==''] <- 'NA'
 #df_1$post_until <- as.factor(df_1$post_until)
 
-head(df_1$post_until,1000)
-str(df_1$post_until)
 
 dbWriteTable(con, name="post_info_table", 
              value=df_1[c('post_id','posting_date','post_until', 'posting_updated')]
@@ -206,16 +207,14 @@ dbWriteTable(con, name="post_info_table",
 
 # Create location_table
 work = c('work_location_sepcific', 'work_location_agency')
-temp_locationid_df$work_location_agency[temp_locationid_df$work_location_agency==""] <- "NA"
-temp_locationid_df$work_location_specific[temp_locationid_df$work_location_specific==""] <- "NA"
+#temp_locationid_df$work_location_agency[temp_locationid_df$work_location_agency==""] <- "NA"
+#temp_locationid_df$work_location_specific[temp_locationid_df$work_location_specific==""] <- "NA"
 temp_locationid_df <-unique(df_1[work])
 temp_locationid_df$location_id = 1:nrow(temp_locationid_df)
-head(temp_locationid_df$location_id)
-sum(is.na(temp_locationid_df$location_id))
 
-df_2 = merge(df_1, temp_locationid_df, by = work, all.x =TRUE)
+#sum(is.na(temp_locationid_df$location_id))
 
-head(df_2$location_id)
+df_2 = merge(x = df_1, y = temp_locationid_df, by =c("work_location_sepcific","work_location_agency"), all.x = TRUE)
 
 dbWriteTable(con, name="location_table", 
              value=df_2[c('location_id','work_location_sepcific','work_location_agency')]
@@ -227,8 +226,11 @@ dbWriteTable(con, name="location_table",
 re_list = c('preferred_skills', 'residency_requirement', 'additional_information')
 temp_require_df <-unique(df[re_list])
 temp_require_df$requirement_id = 1:nrow(temp_require_df)
-df_2 = merge(df_2, temp_require_df, by = re_list) 
-head(df_2$requirement_id)
+#Q: here did not use all.x = TRUE and it works, in table 1, it does work without it.
+df_2 = merge(df_2, temp_require_df, by = re_list)
+# delete: test = c('preferred_skills', 'residency_requirement', 'additional_information','requirement_id')
+# delete: tt = unique(df_3[test])
+# delete: dim(temp_require_df)
 
 dbWriteTable(con, name="requirement_table", 
              value=df_2[c('requirement_id','preferred_skills','residency_requirement','additional_information')]
@@ -240,7 +242,7 @@ head(dbReadTable(con,name='requirement_table'),3)
 salary = c('salary_range_from','salary_range_to','salary_frequency')
 temp_salary_df = unique(df[salary])
 temp_salary_df$salary_id = 1:nrow(temp_salary_df)
-df_2 = merge(df_2, temp_salary_df, by = salary) 
+df_2 = merge(df_2, temp_salary_df, by = salary)
 
 dbWriteTable(con, name="salary_table", 
              value=df_2[c('salary_id', 'salary_range_from','salary_range_to','salary_frequency')]
@@ -267,7 +269,7 @@ temp_title_df <- data.frame('title_classification' = unique(df$title_classificat
 temp_title_df$classification_id <- 1:nrow(temp_title_df)
 
 head(temp_title_df)
-df_2 = merge(df_2, temp_title_df, by = "title_classification") 
+df_2 = merge(df_2, temp_title_df, by = "title_classification")
 
 dbWriteTable(con, name="title_classification_table", 
              value=df_2[c('classification_id', 'title_classification')][!duplicated(df_2[c('classification_id', 'title_classification')]),],
@@ -288,6 +290,7 @@ apply_id_list <- sapply(df_2$to_apply, function(x) temp_apply_df$apply_id[temp_a
 
 # Add apply_id to the main dataframe
 df_2$apply_id <- apply_id_list
+
 
 # populate apply_entrance_table
 dbWriteTable(con, name="apply_entrance_table", 
@@ -311,9 +314,6 @@ cate_id_list <- sapply(df_2$job_category, function(x) temp_cate_df$category_id[t
 # Add apply_id to the main dataframe
 df_2$category_id <- cate_id_list
 
-#subset job category table and rename job.ID column
-#df_2 <- df_2[c('category_id', 'job_category')]
-
 
 # populate category_table
 dbWriteTable(con, name="category_table", 
@@ -331,15 +331,82 @@ temp_type_df$type_id <- 1:nrow(temp_type_df)
 
 df_2 = merge(df_2, temp_type_df, by = "posting_type") 
 
-head(temp_type_df)
 dbWriteTable(con, name="job_type_table", 
              value=df_2[c('type_id', 'posting_type')][!duplicated(df_2[c('type_id', 'posting_type')]),],
              row.names=FALSE, append=TRUE)
 
 
-###########3#salary_career_level_table############3
+##salary_career_level_table
+salary_career_level = c('salary_id', 'level_id')
+temp_salary_level_df <- unique(df_2[salary_career_level])
+temp_salary_level_df$salary_career_id <- 1:nrow(temp_salary_level_df)
+df_2 = merge(df_2, temp_salary_level_df, by = salary_career_level) 
+
+head(df_2['id', 'full_part_id'])
+dbWriteTable(con, name="salary_career_level_table", 
+             value=df_2[c('salary_career_id', 'salary_id','level_id')]
+             [!duplicated(df_2[c('salary_id', 'level_id')]),],
+             row.names=FALSE, append=TRUE)
+head(dbReadTable(con,name='salary_career_level_table'),3)
+
 
 ##apply_job_table
 dbWriteTable(con, name="apply_job_table", 
              value=df_2[c('apply_id', 'id')][!duplicated(df_2[c('apply_id', 'id')]),],
              row.names=FALSE, append=TRUE)
+
+###create df location_Job_table(xiang)
+# populate location_Job_table
+dbWriteTable(con, name="location_Job_table", 
+             value=df_2[c("id", 'location_id')][
+               !duplicated(df_2[c("id", 'location_id')]),],
+             row.names=FALSE, append=TRUE)
+
+################job_info_table#######
+df_2$job_id<- df_2$Job.ID
+head(df_2$job_id)
+
+dbWriteTable(con, name="job_info_table", 
+             value=df_2[c('id', 'job_id','business_title','post_id','salary_career_id','category_id','requirement_id','type_id','classification_id')]
+             [!duplicated(df_2[c('id', 'job_id','business_title','post_id','salary_career_id','category_id','requirement_id','type_id','classification_id')]),],
+             row.names=FALSE, append=TRUE)
+
+
+
+########################################### 
+#job_hours_table
+
+dbWriteTable(con, name="job_hours_table", 
+             value=df_2[c('id','hours_shift')]
+             [!duplicated(df_2[c('id','hours_shift')]),],
+             row.names=FALSE, append=TRUE)
+head(dbReadTable(con,name='salary_table'),3)
+
+
+
+## full_part_table  
+full_part_df <- c('id', 'full_part')
+temp_full_part_df <- df_2[c('id', 'full_part')]
+temp_full_part_df <- unique(temp_full_part_df)
+temp_full_part_df$full_part_id <- 1:nrow(temp_full_part_df)
+df_2 = merge(df_2, temp_full_part_df, by = full_part_df) 
+
+dbWriteTable(con, name="full_part_table", 
+             value=df_2[c('full_part_id','id','full_part')]
+             [!duplicated(df_2[c('full_part_id')]),],
+             row.names=FALSE, append=TRUE)
+head(dbReadTable(con,name='full_part_table'),3)
+
+
+#close the connection
+dbDisconnect(con)
+closeAllConnections()
+
+# -- END R CODE --
+
+
+
+
+
+
+
